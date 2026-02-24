@@ -1,0 +1,213 @@
+-- ===============================
+-- ตารางอาหารแมว (ใช้ special_care + age_group ใหม่)
+-- ===============================
+
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2),
+    weight VARCHAR(50),
+
+    age_group VARCHAR(20)
+        CHECK (age_group IN ('newborn', 'kitten', 'adult', 'senior')),
+
+    breed_type VARCHAR[] DEFAULT ARRAY['all'],
+
+    special_care VARCHAR[] DEFAULT ARRAY['all'],  
+
+    category VARCHAR(20) 
+        CHECK (category IN ('dry', 'wet', 'snack')),
+
+    stock INT DEFAULT 0,
+    image_url TEXT,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- ===============================
+-- trigger update updated_at
+-- ===============================
+
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER update_products_modtime
+BEFORE UPDATE ON products
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+
+-- ===============================
+-- INSERT DATA (ใช้ special_care)
+-- ===============================
+
+INSERT INTO products 
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+('อาหารเม็ดลูกแมวสูตรเสริมภูมิคุ้มกันและการเจริญเติบโต',
+ 'สูตรเฉพาะสำหรับลูกแมววัยกำลังโต เสริมภูมิคุ้มกัน โปรตีนย่อยง่าย ช่วยระบบย่อยและการเจริญเติบโต',
+ 289, '400g', 'kitten', ARRAY['all'], ARRAY['all'], 'dry', 60,
+ 'https://tailybuddy.com/products/344/KITTEN_newpack_01.jpg'),
+
+('อาหารเม็ดลูกแมวพลังงานสูงสำหรับการเติบโตไว',
+ 'พลังงานสูงเหมาะกับลูกแมวโตไว เสริม DHA และโปรตีนคุณภาพสูง',
+ 349, '1kg', 'kitten', ARRAY['all'], ARRAY['all'], 'dry', 70,
+ 'https://kingkongpetshop.com/wp-content/uploads/2024/01/SAVOUR-EXIGENT.jpg'),
+
+('อาหารเม็ดลูกแมวสูตรผิวหนังแข็งแรงและขนเงางาม',
+ 'โอเมก้า 3 & 6 เสริมผิวหนังสุขภาพดีและขนเงางาม',
+ 329, '1kg', 'kitten', ARRAY['all'], ARRAY['ผิวหนังและขน'], 'dry', 55,
+ 'https://tailybuddy.com/products/378/Hair___Skin_Care.jpg'),
+
+('อาหารเม็ดลูกแมวดูแลระบบทางเดินอาหาร',
+ 'โปรตีนย่อยง่าย พรีไบโอติก ลดปัญหาท้องเสียและระบบย่อยอาหารบอบบาง',
+ 345, '1kg', 'kitten', ARRAY['all'], ARRAY['ระบบทางเดินอาหาร'], 'dry', 40,
+ 'https://www.brekz.dk/34089/large_default.jpg'),
+
+('อาหารสำหรับแมวมีภาวะท้องผูก ปรับสมดุลลำไส้',
+ 'อาหารเม็ด ประกอบการรักษาโรค สำหรับแมวโต ที่มีอาการท้องผูก หรือขาดไฟเบอร์และลำไส้ใหญ่อักเสบ อายุ 1 ปีขึ้นไปปลอดภัยต่อระบบทางเดินอาหารโปรตีนคุณภาพดีย่อยได้สูง พร้อมใยอาหารที่สมดุลและพรีไบโอติกส์',
+ 45, '85g', 'adult', ARRAY['all'], ARRAY['ระบบทางเดินอาหาร'], 'dry', 100,
+ 'https://mzoopetmall.com/wp-content/uploads/2023/12/gastro-fiber-768x768.jpeg');
+
+
+INSERT INTO products 
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+('อาหารเม็ดแมวโตลดก้อนขน Hairball',
+ 'ไฟเบอร์คอมเพล็กซ์ช่วยลดการเกิดก้อนขน เหมาะกับแมวขนยาวหรือเลียขนบ่อย',
+ 349, '1kg', 'adult', ARRAY['all'], ARRAY['ก้อนขน'], 'dry', 85,
+ 'https://kingkongpetshop.com/wp-content/uploads/2024/01/HAIRBALL.jpg'),
+
+('อาหารเม็ดแมวโตควบคุมน้ำหนักแคลอรีต่ำ',
+ 'แคลอรีต่ำแต่โปรตีนสูง รักษามวลกล้ามเนื้อ เหมาะกับแมวควบคุมน้ำหนัก',
+ 359, '1kg', 'adult', ARRAY['all'], ARRAY['ควบคุมน้ำหนัก'], 'dry', 100,
+ 'https://thonglorpetshop.com/wp-content/uploads/2020/02/Untitled-design-12-2-1.png'),
+
+('อาหารเปียกแมวโตผสมซอสเกรวี่เนื้อนุ่ม',
+ 'เนื้อเกรวี่ฉ่ำช่วยเพิ่มความอยากอาหาร เหมาะกับแมวเลือกกิน',
+ 45, '85g', 'adult', ARRAY['all'], ARRAY['all'], 'wet', 140,
+ 'https://littlespider.co.th/upload-img/RC_PET/9003579308738.jpg'),
+
+('อาหารเม็ดแมวโตย่อยง่ายสำหรับแมวทำหมัน',
+ 'โปรตีนย่อยง่าย พรีไบโอติก ลดกลิ่นมูล เหมาะกับแมวทำหมัน',
+ 359, '1kg', 'adult', ARRAY['all'], ARRAY['ทำหมัน'], 'dry', 75,
+ 'https://tailybuddy.com/products/365/Sterilised_37.jpg');
+
+
+INSERT INTO products 
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+('อาหารเม็ดสูตรเฉพาะสำหรับแมวเปอร์เซีย',
+ 'เม็ดอาหารออกแบบให้เคี้ยวง่ายสำหรับแมวหน้าแบน ลดก้อนขนและเสริมขนเงางาม',
+ 429, '1.5kg', 'adult', ARRAY['เปอร์เซีย'], ARRAY['ปัญหาก้อนขน'], 'dry', 40,
+ 'https://img.lazcdn.com/g/p/8c3a23589625fc4be2c2d15e007dac78.jpg_720x720q80.jpg'),
+
+('อาหารเม็ดสูตรสำหรับแมวบริติชช็อตแฮร์',
+ 'โปรตีนสูงสำหรับแมวโครงสร้างใหญ่ ช่วยเสริมสร้างกล้ามเนื้อ',
+ 439, '1.5kg', 'adult', ARRAY['บริติชช็อตแฮร์'], ARRAY['all'], 'dry', 50,
+ 'https://tailybuddy.com/products/9205/BRITISH_SHORTHAIR_KITTEN_02.jpg'),
+
+('อาหารเม็ดแมวสายพันธุ์เมนคูน',
+ 'พลังงานสูง เสริมข้อต่อและหัวใจ เหมาะกับแมวตัวใหญ่',
+ 499, '2kg', 'adult', ARRAY['เมนคูน'], ARRAY['all'], 'dry', 30,
+ 'https://th-test-11.slatic.net/p/1879e104d61655504eba3d343d8003e4.jpg');
+
+ -- ===============================
+-- 1) SENIOR (3 รายการ)
+-- ===============================
+INSERT INTO products 
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+
+('อาหารเม็ดแมวสูงวัยดูแลไตและระบบขับถ่าย',
+ 'โปรตีนคัดสรร โซเดียมต่ำ ช่วยลดภาระการทำงานของไต เหมาะกับแมวสูงวัย',
+ 479, '1kg', 'senior', ARRAY['all'], ARRAY['ระบบทางเดินอาหาร'], 'dry', 45,
+ 'https://img.lazcdn.com/g/p/1c7ab103c28cc910b7b40685965f15ca.jpg'),
+
+('อาหารเปียกแมวสูงวัยเนื้อนุ่มย่อยง่าย',
+ 'เนื้อสัมผัสนุ่มพิเศษ ย่อยง่าย เพิ่มความอยากอาหารในแมวสูงวัย',
+ 55, '85g', 'senior', ARRAY['all'], ARRAY['all'], 'wet', 120,
+ 'https://img.lazcdn.com/g/p/a8c0c49b16e2b30d4ee6f4dcfb614886.png');
+
+
+
+-- ===============================
+-- 2) ผิวหนังและขน (2 รายการ)
+-- ===============================
+INSERT INTO products 
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+('อาหารเม็ดแมวโตสูตรเสริมผิวหนังแข็งแรงและขนสวย',
+ 'สูตรโอเมก้า 3 และไบโอติน ช่วยให้ผิวแข็งแรงและขนเงางาม',
+ 399, '1kg', 'adult', ARRAY['all'], ARRAY['ผิวหนังและขน'], 'dry', 60,
+ 'https://tailybuddy.com/products/378/Hair___Skin_Care.jpg');
+
+
+
+-- ===============================
+-- 3) บริติชช็อตแฮร์ (2 รายการ)
+-- ===============================
+INSERT INTO products
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+('อาหารเม็ดสูตรเฉพาะสำหรับแมวบริติชช็อตแฮร์โครงสร้างใหญ่',
+ 'โปรตีนสูง ไขมันเหมาะสม ช่วยสร้างมวลกล้ามเนื้อแมวโครงสร้างใหญ่',
+ 499, '1.5kg', 'adult', ARRAY['บริติชช็อตแฮร์'], ARRAY['all'], 'dry', 40,
+ 'https://www.petnme.co.th/wp-content/uploads/2024/05/A230500146294-0-768x768.png');
+
+
+
+-- ===============================
+-- 4) SNACK (4 รายการ)
+-- ===============================
+INSERT INTO products 
+(name, description, price, weight, age_group, breed_type, special_care, category, stock, image_url)
+VALUES
+('ขนมแมวแบบเม็ดสูตรควบคุมน้ำหนัก',
+ 'ขนมแคลอรีต่ำ เสริมไฟเบอร์ ช่วยควบคุมน้ำหนัก',
+ 79, '40g', 'adult', ARRAY['all'], ARRAY['ควบคุมน้ำหนัก'], 'snack', 150,
+ 'https://img.lazcdn.com/g/p/0f0b358cd9a3b8d90c2d9d8a60fc1775.jpg'),
+
+('ขนมแมวช่วยลดก้อนขนแบบเคี้ยวง่าย',
+ 'ไฟเบอร์คอมเพล็กซ์ช่วยป้องกันการก้อนขน เคี้ยวง่ายแมวชอบ',
+ 85, '35g', 'adult', ARRAY['all'], ARRAY['ก้อนขน'], 'snack', 160,
+ 'https://tailybuddy.com/products/400/Intense_Beauty_Gravy.jpg'),
+
+('ขนมแมวเพิ่มความอยากอาหารรสเข้มข้น',
+ 'สูตรกระตุ้นความอยากอาหาร เหมาะกับแมวเลือกกิน',
+ 75, '30g', 'adult', ARRAY['all'], ARRAY['all'], 'snack', 150,
+ 'https://littlespider.co.th/upload-img/RC_PET/9003579308738.jpg');
+
+
+-- ===============================
+-- ตารางผู้ใช้ (Users)
+-- ===============================
+
+CREATE TYPE user_role AS ENUM ('admin', 'customer');
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role user_role NOT NULL DEFAULT 'customer',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- ===============================
+-- ตัวอย่างข้อมูลผู้ใช้เริ่มต้น
+-- ===============================
+
+INSERT INTO users (email, password, role)
+VALUES
+('admin@example.com', 'admin123', 'admin'),
+('user@example.com', 'user123', 'customer');
+

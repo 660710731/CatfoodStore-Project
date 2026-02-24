@@ -1,0 +1,393 @@
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import axios from "axios";
+
+export default function ProductListPage() {
+  const location = useLocation();
+
+  const [filters, setFilters] = useState({
+    type: "",
+    age: [],
+    special_care: [],
+    breed: [],
+  });
+
+  const [sortBy, setSortBy] = useState("");
+  const [allProducts, setAllProducts] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [toast, setToast] = useState(null);
+
+  const [openAge, setOpenAge] = useState(true);
+  const [openHealth, setOpenHealth] = useState(true);
+  const [openBreed, setOpenBreed] = useState(true);
+
+  const [loaded, setLoaded] = useState(false); // ⭐ ป้องกัน render ก่อนโหลดเสร็จ
+
+  /* ⭐ โหลดฟิลเตอร์จาก localStorage */
+useEffect(() => {
+  const saved = JSON.parse(localStorage.getItem("filters"));
+  if (saved) {
+    setFilters(saved);
+  }
+}, []);
+
+/* ⭐ ตั้งค่า filter จาก ?breed=xxx เมื่อมาจากหน้า Home */
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const breed = params.get("breed");
+
+  if (breed) {
+    const newFilters = {
+      ...filters,
+      breed: [breed],
+    };
+
+    setFilters(newFilters);
+    localStorage.setItem("filters", JSON.stringify(newFilters));
+  }
+}, [location.search]);
+
+
+  /* ⭐ บันทึก filters ทุกครั้งที่เปลี่ยน */
+  useEffect(() => {
+    localStorage.setItem("filters", JSON.stringify(filters));
+  }, [filters]);
+
+  /* ⭐ โหลดสินค้า */
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await axios.get("/api/products");
+
+        const items = res.data.map((p) => ({
+          ...p,
+          special_care: (p.special_care || []).map((h) => h.toLowerCase()),
+          breed_type: (p.breed_type || []).map((b) =>
+            b === "all" ? "ทุกสายพันธุ์" : b
+          ),
+        }));
+
+        setAllProducts(items);
+        setLoaded(true); // ⭐ โหลดสินค้าเสร็จแล้ว ค่อย render UI
+      } catch (e) {
+        console.error("Load failed", e);
+      }
+    };
+    load();
+  }, []);
+
+  /* ⭐ Dynamic breed options */
+  const breedOptions = React.useMemo(() => {
+    const set = new Set();
+    allProducts.forEach((p) => {
+      (p.breed_type || []).forEach((b) => set.add(b));
+    });
+    return [...set].map((b) => ({ label: b, value: b }));
+  }, [allProducts]);
+
+  /* ⭐ Dynamic special care options */
+  const specialCareOptions = React.useMemo(() => {
+    const set = new Set();
+    allProducts.forEach((p) => {
+      (p.special_care || []).forEach((h) => {
+        if (h !== "all") set.add(h);
+      });
+    });
+
+    return [...set].map((h) => ({
+      label: h,
+      value: h,
+    }));
+  }, [allProducts]);
+
+  /* ⭐ Age options */
+  const ageOptions = [
+    { label: "ลูกแมว", value: "kitten" },
+    { label: "แมวโต", value: "adult" },
+    { label: "แมวสูงอายุ", value: "senior" },
+  ];
+
+  /* ⭐ Add to cart */
+  const addToCart = (product) => {
+    const cart = JSON.parse(localStorage.getItem("cart")) || [];
+    const idx = cart.findIndex((i) => i.id === product.id);
+
+    if (idx >= 0) cart[idx].quantity += 1;
+    else cart.push({ ...product, quantity: 1 });
+
+    localStorage.setItem("cart", JSON.stringify(cart));
+    window.dispatchEvent(new Event("cart-updated"));
+
+    setToast(`${product.name} ถูกเพิ่มลงตะกร้าแล้ว 🛒`);
+    setTimeout(() => setToast(null), 2000);
+  };
+
+  /* ⭐ Toggle checkbox → บันทึก localStorage ทันที */
+  const toggleCheckbox = (group, value) => {
+    setFilters((prev) => {
+      const set = new Set(prev[group]);
+      set.has(value) ? set.delete(value) : set.add(value);
+
+      const updated = { ...prev, [group]: [...set] };
+      localStorage.setItem("filters", JSON.stringify(updated)); 
+      return updated;
+    });
+  };
+
+  /* ⭐ FILTER LOGIC */
+  useEffect(() => {
+    let result = allProducts;
+
+    if (filters.type) result = result.filter((p) => p.category === filters.type);
+
+    if (filters.age.length)
+      result = result.filter((p) => filters.age.includes(p.age_group));
+
+    if (filters.special_care.length)
+      result = result.filter((p) =>
+        p.special_care.some((h) => filters.special_care.includes(h))
+      );
+
+    if (filters.breed.length)
+      result = result.filter((p) =>
+        p.breed_type.some((b) => filters.breed.includes(b))
+      );
+
+    if (sortBy === "price_asc")
+      result = [...result].sort((a, b) => a.price - b.price);
+
+    if (sortBy === "price_desc")
+      result = [...result].sort((a, b) => b.price - a.price);
+
+    if (sortBy === "newest")
+      result = [...result].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      );
+
+    setFiltered(result);
+  }, [filters, allProducts, sortBy]);
+
+  const resetFilters = () => {
+    const empty = { type: "", age: [], special_care: [], breed: [] };
+    setFilters(empty);
+    localStorage.setItem("filters", JSON.stringify(empty));
+  };
+
+  /* ⭐ ป้องกัน render ก่อนโหลดสินค้ากับ filters เสร็จ */
+  if (!loaded) return null;
+
+  /* ===================== UI ===================== */
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-8">
+
+      {/* PAGE TITLE */}
+      <div className="mt-2 mb-4">
+        <h1 className="text-3xl font-bold text-gray-900">หมวดหมู่สินค้า</h1>
+        <p className="text-gray-600 text-base font-medium mt-1">
+          พบ {filtered.length} รายการ
+        </p>
+      </div>
+
+
+      {/* CATEGORY + SORT */}
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
+        <div className="flex gap-3 flex-wrap">
+          {[
+            { label: "ทั้งหมด", value: "" },
+            { label: "อาหารเม็ด", value: "dry" },
+            { label: "อาหารเปียก", value: "wet" },
+            { label: "ขนมแมว", value: "snack" },
+          ].map((c) => (
+            <button
+              key={c.value}
+              onClick={() =>
+                setFilters((prev) => {
+                  const updated = { ...prev, type: c.value };
+                  localStorage.setItem("filters", JSON.stringify(updated)); 
+                  return updated;
+                })
+              }
+              className={`
+                px-6 py-2.5 rounded-full text-base font-medium transition
+                ${
+                  filters.type === c.value
+                    ? "bg-red-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }
+              `}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        
+        <div className="flex items-center gap-4">
+          <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+        </div>
+      </div>
+
+
+      {/* GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+
+        
+        {/* SIDEBAR */}
+        <aside className="md:col-span-1 bg-white border rounded-xl shadow-sm p-6 h-fit">
+
+          <div className="flex justify-between mb-3">
+            <h2 className="text-lg font-semibold">ตัวกรองสินค้า</h2>
+            <button
+              onClick={resetFilters}
+              className="text-sm text-red-600 hover:text-red-700 transition"
+            >
+              ล้างทั้งหมด
+            </button>
+          </div>
+
+          <div className="border-b my-4"></div>
+
+          {/* AGE */}
+          <Collapse title="ช่วงวัยแมว" open={openAge} setOpen={setOpenAge}>
+            <FilterGroup
+              items={ageOptions}
+              selected={filters.age}
+              toggle={(v) => toggleCheckbox("age", v)}
+            />
+          </Collapse>
+
+          <div className="border-b my-4"></div>
+
+          {/* SPECIAL CARE */}
+          <Collapse
+            title="สุขภาพเฉพาะทาง"
+            open={openHealth}
+            setOpen={setOpenHealth}
+          >
+            <FilterGroup
+              items={specialCareOptions}
+              selected={filters.special_care}
+              toggle={(v) => toggleCheckbox("special_care", v)}
+            />
+          </Collapse>
+
+          <div className="border-b my-4"></div>
+
+          {/* BREED */}
+          <Collapse title="สายพันธุ์แมว" open={openBreed} setOpen={setOpenBreed}>
+            <FilterGroup
+              items={breedOptions}
+              selected={filters.breed}
+              toggle={(v) => toggleCheckbox("breed", v)}
+            />
+          </Collapse>
+        </aside>
+
+        {/* PRODUCT LIST */}
+        <main className="md:col-span-3">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filtered.map((item) => (
+              <ProductCard key={item.id} product={item} addToCart={addToCart} />
+            ))}
+          </div>
+        </main>
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white px-5 py-3 rounded-xl shadow z-50">
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ========= COMPONENTS ========= */
+
+function Collapse({ title, open, setOpen, children }) {
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex justify-between items-center w-full pb-2"
+      >
+        <h3 className="font-medium text-base text-gray-900">{title}</h3>
+        <span className="text-gray-400 text-lg">
+          {open ? "﹀" : "〉"}
+        </span>
+      </button>
+      {open && <div className="pl-1 pt-2">{children}</div>}
+    </div>
+  );
+}
+
+function SortDropdown({ sortBy, setSortBy }) {
+  return (
+    <div className="relative">
+      <select
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value)}
+        className="px-4 py-2 pr-10 rounded-lg border shadow-sm bg-white text-gray-700 font-medium appearance-none"
+      >
+        <option value="">จัดเรียงสินค้า</option>
+        <option value="price_asc">ราคาน้อย → มาก</option>
+        <option value="price_desc">ราคามาก → น้อย</option>
+        <option value="newest">ใหม่ล่าสุด</option>
+      </select>
+
+      <span className="pointer-events-none absolute right-3 top-2.5 text-gray-500 text-lg">
+        ﹀
+      </span>
+    </div>
+  );
+}
+
+function FilterGroup({ items, selected, toggle }) {
+  return (
+    <div className="space-y-2">
+      {items.map((o) => (
+        <label key={o.value} className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={selected.includes(o.value)}
+            onChange={() => toggle(o.value)}
+            className="w-5 h-5 text-red-600"
+          />
+          <span>{o.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function ProductCard({ product, addToCart }) {
+  return (
+    <div className="bg-white border rounded-2xl shadow hover:shadow-lg transition p-4 flex flex-col">
+
+      <Link to={`/products/${product.id}`}>
+        <img
+          src={product.image_url}
+          alt={product.name}
+          className="w-full h-52 object-cover rounded-lg"
+        />
+      </Link>
+
+      <h3 className="font-semibold text-base text-gray-900 leading-snug mt-3 mb-2">
+        {product.name}{" "}
+        <span className="font-semibold text-gray-900">{product.weight}</span>
+      </h3>
+
+      <p className="text-red-600 font-bold text-lg mb-4">
+        {product.price} ฿
+      </p>
+
+      <button
+        onClick={() => addToCart(product)}
+        className="mt-auto w-full py-2.5 bg-red-600 text-white rounded-lg font-semibold shadow hover:bg-red-700 transition"
+      >
+        🛒 เพิ่มลงตะกร้า
+      </button>
+    </div>
+  );
+}
